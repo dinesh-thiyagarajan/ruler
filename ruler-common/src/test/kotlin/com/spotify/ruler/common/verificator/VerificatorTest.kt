@@ -62,6 +62,38 @@ class VerificatorTest {
         assertThrows<SizeExceededException> { verificator.verify(appFiles) }
     }
 
+    @Test
+    fun `Download size exception message is human-readable`() {
+        val downloadSize = config.downloadSizeThreshold * 2
+        val appFiles = generateAppFiles(downloadSize)
+
+        val exception = assertThrows<SizeExceededException> { verificator.verify(appFiles) }
+        val message = exception.message!!
+
+        // Verify the message contains formatted sizes (not just bytes)
+        assert(message.contains("Download size of"))
+        assert(message.contains("exceeds the threshold of"))
+        assert(message.contains("by"))
+        // Message should not end with "bytes." anymore
+        assert(!message.endsWith("bytes."))
+    }
+
+    @Test
+    fun `Install size exception message is human-readable`() {
+        val installSize = config.installSizeThreshold * 2
+        val appFiles = generateAppFiles(config.downloadSizeThreshold, installSize)
+
+        val exception = assertThrows<SizeExceededException> { verificator.verify(appFiles) }
+        val message = exception.message!!
+
+        // Verify the message contains formatted sizes (not just bytes)
+        assert(message.contains("Install size of"))
+        assert(message.contains("exceeds the threshold of"))
+        assert(message.contains("by"))
+        // Message should not end with "bytes." anymore
+        assert(!message.endsWith("bytes."))
+    }
+
     private fun generateAppFiles(
         downloadSize: Long,
         installSize: Long = downloadSize

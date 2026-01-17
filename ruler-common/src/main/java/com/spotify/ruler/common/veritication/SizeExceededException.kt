@@ -16,5 +16,10 @@
 
 package com.spotify.ruler.common.veritication
 
+import com.spotify.ruler.common.util.formatBytes
+
 class SizeExceededException(label: String, size: Long, threshold: Long) :
-    Exception("$label size exceeds the threshold by ${size - threshold} bytes.")
+    Exception(
+        "$label size of ${formatBytes(size)} exceeds the threshold of ${formatBytes(threshold)} " +
+            "by ${formatBytes(size - threshold)}."
+    )
