@@ -43,13 +43,29 @@ class RulerPlugin : Plugin<Project> {
                 project.extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
             androidComponents.onVariants { variant ->
                 val variantName = StringGroovyMethods.capitalize(variant.name)
+                val resolve = EntryParser().parse(variant.runtimeConfiguration)
+
+                // Task to export dependency map for CLI usage
+                project.tasks.register(
+                    "export${variantName}DependencyMap",
+                    ExportDependencyMapTask::class.java
+                ) { task ->
+                    task.group = name
+                    task.description = "Exports dependency map for ${variant.name} variant to JSON file for use with ruler-cli"
+
+                    resolve.forEach(task.dependencyEntries::put)
+
+                    task.outputFile.set(
+                        project.layout.buildDirectory.file("outputs/ruler/${variant.name}/dependency-map.json")
+                    )
+                }
+
+                // Task to run the full analysis
                 project.tasks.register(
                     "analyze${variantName}Bundle",
                     RulerTask::class.java
                 ) { task ->
                     task.group = name
-
-                    val resolve = EntryParser().parse(variant.runtimeConfiguration)
 
                     resolve.forEach(task.dependencyEntries::put)
 

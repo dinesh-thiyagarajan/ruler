@@ -78,6 +78,71 @@ ruler {
 
 Once this is done, `analyze<VariantName>Bundle` tasks will be added for each of your app variants. Running this task will build the app and generate an HTML report, which you can use to analyze your app size. It will also generate a JSON report, in case you want to further process the data.
 
+## Using the CLI and Wrapper Script
+
+Ruler also provides a CLI tool and a wrapper script for more advanced workflows or integration with non-Gradle build systems.
+
+### Exporting Dependency Map
+
+You can export the dependency map for any variant using the following Gradle task:
+
+```bash
+./gradlew export<VariantName>DependencyMap
+```
+
+This will generate a `dependency-map.json` file at `build/outputs/ruler/<variant>/dependency-map.json`. This file can be used with the ruler-cli tool for analysis.
+
+### Using the Wrapper Script
+
+The `scripts/ruler-analyze.sh` wrapper script automates the process of exporting the dependency map and running the ruler-cli analysis in a single command:
+
+```bash
+# Full workflow: Export dependency map and run analysis
+./scripts/ruler-analyze.sh \
+  --variant release \
+  --ruler-cli /path/to/ruler-cli.jar \
+  --bundle-file app/build/outputs/bundle/release/app-release.aab
+
+# Only export dependency map
+./scripts/ruler-analyze.sh --variant release --gradle-only
+
+# Only run CLI analysis (dependency map must already exist)
+./scripts/ruler-analyze.sh \
+  --variant release \
+  --ruler-cli /path/to/ruler-cli.jar \
+  --bundle-file app/build/outputs/bundle/release/app-release.aab \
+  --cli-only
+```
+
+#### Available Options
+
+- `--variant`: Build variant to analyze (default: release)
+- `--project-dir`: Project directory (default: current directory)
+- `--ruler-cli`: Path to ruler-cli JAR file (required unless using `--gradle-only`)
+- `--apk-file`: Path to APK file for analysis
+- `--bundle-file`: Path to Bundle file for analysis
+- `--mapping-file`: Path to ProGuard/R8 mapping file
+- `--resource-mapping-file`: Path to resource mapping file
+- `--ownership-file`: Path to ownership YAML file
+- `--report-dir`: Output directory for reports
+- `--default-owner`: Default owner for unattributed files (default: unknown)
+- `--omit-file-breakdown`: Omit file-level breakdown in reports
+- `--gradle-only`: Only export dependency map, don't run analysis
+- `--cli-only`: Skip dependency map export, only run CLI analysis
+
+### Direct CLI Usage
+
+You can also use the ruler-cli directly with a pre-generated dependency map:
+
+```bash
+java -jar ruler-cli.jar \
+  --dependency-map=build/outputs/ruler/release/dependency-map.json \
+  --bundle-file=app/build/outputs/bundle/release/app-release.aab \
+  --project-path=. \
+  --app-info-file=build/outputs/ruler/release/app-info.json \
+  --report-dir=build/reports/ruler-cli/release
+```
+
 ## Ownership
 
 In larger organizations, Gradle modules and dependencies are often owned by specific teams. If that's the case for your app, Ruler can help you analyze app size contributions by different teams. All you need to do is provide a YAML file listing all components and their owners. It's also possible to specify ownership for individual files, if some of the files within a component are owned by a different team:
@@ -122,6 +187,8 @@ When you pass an ownership file to Ruler, you'll see a new tab in the HTML repor
 Ruler is built with Kotlin and contains multiple modules:
 
 - **ruler-gradle-plugin:** Core Gradle plugin where the APK parsing, dependency handling and attribution logic lives.
+- **ruler-cli:** Command-line interface tool for running Ruler analysis from non-Gradle build systems.
+- **ruler-common:** Shared analysis engine used by both the Gradle plugin and CLI.
 - **ruler-frontend:** React template used for the HTML report, built with Kotlin JS.
 - **ruler-models:** Common models shared between the Gradle plugin and the frontend, built with Kotlin Multiplatform.
 - **ruler-frontend-tests:** UI tests for the HTML report frontend.
