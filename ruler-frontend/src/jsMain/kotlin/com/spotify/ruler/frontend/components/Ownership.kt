@@ -111,14 +111,17 @@ val ComponentOwnershipPerTeam = FC<ComponentOwnershipPerTeamProps> { props ->
     val files: List<AppFile>?
     var owners: List<String>
     if (props.hasFileLevelInfo) {
-        files = props.components.mapNotNull(AppComponent::files).flatten()
+        files = props.components
+            .mapNotNull { it.files?.takeIf { files -> files.isNotEmpty() } }
+            .flatten()
+            .ifEmpty { emptyList() }
         owners = files.mapNotNull(AppFile::owner)
     } else {
         files = null
         owners = props.components.mapNotNull(AppComponent::owner)
     }
     owners = owners.distinct().sorted()
-    var selectedOwner by useState(owners.first())
+    var selectedOwner by useState(owners.firstOrNull() ?: "unknown")
 
     val ownedComponents = props.components.filter { component -> component.owner == selectedOwner }
     val ownedFiles = files?.filter { file -> file.owner == selectedOwner }

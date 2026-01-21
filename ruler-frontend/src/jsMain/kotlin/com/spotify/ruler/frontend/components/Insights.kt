@@ -47,11 +47,14 @@ val Insights = FC<InsightsProps> { props ->
     }
 
     if (props.hasFileLevelInfo) {
-        val componentFiles = props.components.mapNotNull(AppComponent::files).flatten()
+        val componentFiles = props.components
+            .mapNotNull { it.files?.takeIf { files -> files.isNotEmpty() } }
+            .flatten()
+            .ifEmpty { emptyList() }
         Row {
             className = ClassName("mb-3")
             FileTypeGraphs {
-                files =  componentFiles
+                files = componentFiles
             }
         }
         Row {
@@ -73,7 +76,9 @@ val FileTypeGraphs = FC<FileTypeGraphsProps> { props ->
     val installSizes = LongArray(labels.size)
     val fileCounts = LongArray(labels.size)
 
-    props.files.forEach { file ->
+    // Defensive check to ensure files is never undefined
+    val files = props.files ?: emptyList()
+    files.forEach { file ->
         val index = file.type.ordinal
         downloadSizes[index] += file.getSize(Measurable.SizeType.DOWNLOAD)
         installSizes[index] += file.getSize(Measurable.SizeType.INSTALL)
@@ -161,7 +166,9 @@ val ResourcesTypeGraphs = FC<ResourcesTypeGraphsProps> { props ->
     val installSizes = LongArray(labels.size)
     val fileCounts = LongArray(labels.size)
 
-    props.files.filter { it.resourceType != null }.forEach { file ->
+    // Defensive check to ensure files is never undefined
+    val files = props.files ?: emptyList()
+    files.filter { it.resourceType != null }.forEach { file ->
         val index = file.resourceType!!.ordinal
         downloadSizes[index] += file.getSize(Measurable.SizeType.DOWNLOAD)
         installSizes[index] += file.getSize(Measurable.SizeType.INSTALL)
