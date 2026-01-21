@@ -40,29 +40,40 @@ abstract class ExportDependencyMapTask : DefaultTask() {
 
     @TaskAction
     fun exportDependencyMap() {
-        val allEntries = dependencyEntries.get().values.flatten()
+        val entriesMap = dependencyEntries.get()
 
         val jars = mutableListOf<JarInfo>()
         val assets = mutableListOf<AssetInfo>()
         val resources = mutableListOf<AssetInfo>()
 
-        allEntries.forEach { entry ->
-            when {
-                entry.name.endsWith(".jar") -> {
-                    jars.add(JarInfo(jar = entry.name, module = entry.component))
+        // Process entries by artifact type (android-classes, android-res, android-assets, android-jni)
+        entriesMap.forEach { (artifactType, entries) ->
+            when (artifactType) {
+                "android-classes" -> {
+                    // Add JAR files from android-classes artifact type
+                    entries.forEach { entry ->
+                        if (entry.name.endsWith(".jar")) {
+                            jars.add(JarInfo(jar = entry.name, module = entry.component))
+                        }
+                    }
                 }
-                entry.name.startsWith("/assets/") || entry.name.contains("/assets/") -> {
-                    assets.add(AssetInfo(filename = entry.name, module = entry.component))
+                "android-res" -> {
+                    // Add all resource entries
+                    entries.forEach { entry ->
+                        resources.add(AssetInfo(filename = entry.name, module = entry.component))
+                    }
                 }
-                entry.name.startsWith("/res/") || entry.name.contains("/res/") -> {
-                    resources.add(AssetInfo(filename = entry.name, module = entry.component))
+                "android-assets" -> {
+                    // Add all asset entries
+                    entries.forEach { entry ->
+                        assets.add(AssetInfo(filename = entry.name, module = entry.component))
+                    }
                 }
-                entry.name.endsWith(".class") -> {
-                    // Classes are typically in JARs, handled above
-                }
-                else -> {
-                    // Default to resources for other files
-                    resources.add(AssetInfo(filename = entry.name, module = entry.component))
+                "android-jni" -> {
+                    // Native libraries - add to resources for now
+                    entries.forEach { entry ->
+                        resources.add(AssetInfo(filename = entry.name, module = entry.component))
+                    }
                 }
             }
         }
@@ -83,6 +94,10 @@ abstract class ExportDependencyMapTask : DefaultTask() {
 
         println("Dependency map exported to: ${outputFile.get().asFile.absolutePath}")
         println("Found ${jars.size} JARs, ${assets.size} assets, ${resources.size} resources")
+        println("Breakdown by type:")
+        entriesMap.forEach { (type, entries) ->
+            println("  - $type: ${entries.size} entries")
+        }
     }
 }
 
