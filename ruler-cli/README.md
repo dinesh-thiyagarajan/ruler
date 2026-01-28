@@ -222,3 +222,90 @@ java -jar ruler-cli.jar \
   --project-path ":app" \
   --report-dir ./reports
 ```
+
+## One-Command Analysis Script
+
+The `scripts/ruler_generate_and_analyze.py` script combines dependency map generation and Ruler analysis into a single command. It inspects your Gradle project's dependency graph, locates JAR files in the Gradle cache and build outputs, generates the dependency map JSON, and runs the Ruler CLI.
+
+Requirements: Python 3.10+, a built Gradle project (run `./gradlew assembleRelease` first).
+
+### Generate dependency map only
+
+```bash
+python ruler-cli/scripts/ruler_generate_and_analyze.py generate \
+  --project-dir /path/to/android-project \
+  --app-module :app \
+  --build-variant release \
+  --output dependency-map.json
+```
+
+This runs `./gradlew :app:dependencies` to resolve the full dependency tree, then locates the actual JAR files in `~/.gradle/caches/` and the project's build output directories.
+
+### Generate + analyze in one step
+
+```bash
+python ruler-cli/scripts/ruler_generate_and_analyze.py analyze \
+  --project-dir /path/to/android-project \
+  --app-module :app \
+  --build-variant release \
+  --apk-file app/build/outputs/apk/release/app-release.apk \
+  --ruler-cli-jar ruler-cli/build/libs/ruler-cli-all.jar \
+  --report-dir ./ruler-reports
+```
+
+This will:
+1. Run Gradle to resolve all dependencies
+2. Find JAR files in the Gradle cache and build directories
+3. Collect resources and assets from project modules
+4. Generate `dependency-map.json` and `app-info.json`
+5. Run the Ruler CLI and produce HTML + JSON reports
+
+### Script options
+
+**`generate` subcommand:**
+
+| Option | Default | Description |
+|---|---|---|
+| `--project-dir` | (required) | Root directory of the Gradle project |
+| `--app-module` | `:app` | App module path |
+| `--build-variant` | `release` | Build variant |
+| `--gradle-home` | `~/.gradle` | Gradle home directory for cache lookups |
+| `--output` | `dependency-map.json` | Output file path |
+| `--app-info-output` | | Also generate app-info.json at this path |
+
+**`analyze` subcommand:**
+
+| Option | Default | Description |
+|---|---|---|
+| `--project-dir` | (required) | Root directory of the Gradle project |
+| `--app-module` | `:app` | App module path |
+| `--build-variant` | `release` | Build variant |
+| `--apk-file` | (required) | Path to the APK file |
+| `--ruler-cli-jar` | (required) | Path to the ruler-cli fat JAR |
+| `--report-dir` | `./ruler-reports` | Output directory for reports |
+| `--gradle-home` | `~/.gradle` | Gradle home directory |
+| `--app-info-file` | | Existing app-info.json (auto-generated if omitted) |
+| `--mapping-file` | | ProGuard/R8 mapping file |
+| `--ownership-file` | | Ownership YAML file |
+| `--device-spec-file` | | Device specification JSON |
+| `--download-size-threshold` | | Max download size in bytes |
+| `--install-size-threshold` | | Max install size in bytes |
+
+### How dependency resolution works
+
+The script resolves dependencies through these steps:
+
+1. **Gradle dependency tree**: Runs `./gradlew :app:dependencies --configuration=releaseRuntimeClasspath` and parses the output to extract all dependency coordinates (`group:artifact:version`) and project module references.
+
+2. **JAR location**: For each dependency, searches in order:
+   - Gradle cache: `~/.gradle/caches/modules-2/files-2.1/<group>/<artifact>/<version>/`
+   - Maven local: `~/.m2/repository/<group-path>/<artifact>/<version>/`
+
+3. **Project modules**: For project dependencies (e.g., `:sample:lib`), looks for compiled JARs in:
+   - `<module>/build/intermediates/compile_library_classes_jar/<variant>/classes.jar`
+   - `<module>/build/intermediates/runtime_library_classes_jar/<variant>/classes.jar`
+   - `<module>/build/libs/<module>.jar`
+
+4. **Resources & assets**: Scans each project module's `src/main/res/` and `src/main/assets/` directories.
+
+Dependencies that can't be found (e.g., Android platform libraries, AARs without extracted JARs) are reported as warnings but don't block the analysis.
