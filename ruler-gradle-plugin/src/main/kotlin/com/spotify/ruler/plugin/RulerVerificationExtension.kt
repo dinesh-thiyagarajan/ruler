@@ -16,15 +16,7 @@
 
 package com.spotify.ruler.plugin
 
-import org.gradle.api.model.ObjectFactory
-import org.gradle.api.provider.Property
-
-open class RulerVerificationExtension(objects: ObjectFactory) {
-    val downloadSizeThreshold: Property<Long> = objects.property(Long::class.java)
-    val installSizeThreshold: Property<Long> = objects.property(Long::class.java)
-
-    init {
-        downloadSizeThreshold.convention(Long.MAX_VALUE)
-        installSizeThreshold.convention(Long.MAX_VALUE)
-    }
+open class RulerVerificationExtension {
+    var downloadSizeThreshold: Long = Long.MAX_VALUE
+    var installSizeThreshold: Long = Long.MAX_VALUE
 }

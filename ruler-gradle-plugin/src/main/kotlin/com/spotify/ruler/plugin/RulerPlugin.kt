@@ -25,7 +25,6 @@ import com.spotify.ruler.plugin.dependency.EntryParser
 import org.codehaus.groovy.runtime.StringGroovyMethods
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.plugins.ExtensionAware
 
 class RulerPlugin : Plugin<Project> {
 
@@ -33,10 +32,6 @@ class RulerPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         val rulerExtension = project.extensions.create(name, RulerExtension::class.java)
-        val rulerVerificationExtension = (rulerExtension as ExtensionAware).extensions.create(
-            "verification",
-            RulerVerificationExtension::class.java
-        )
 
         project.plugins.withId("com.android.application") {
             val androidComponents =
@@ -72,7 +67,7 @@ class RulerPlugin : Plugin<Project> {
                     task.omitFileBreakdown.set(rulerExtension.omitFileBreakdown)
                     task.unstrippedNativeFiles.set(rulerExtension.unstrippedNativeFiles)
 
-                    task.verificationConfig.set(getVerificationConfig(rulerVerificationExtension))
+                    task.verificationConfig.set(getVerificationConfig(rulerExtension.verification))
 
                     // Add explicit dependency to support DexGuard
                     task.dependsOn("bundle$variantName")
@@ -98,8 +93,8 @@ class RulerPlugin : Plugin<Project> {
 
     private fun getVerificationConfig(extension: RulerVerificationExtension): VerificationConfig {
         return VerificationConfig(
-            downloadSizeThreshold = extension.downloadSizeThreshold.get(),
-            installSizeThreshold = extension.installSizeThreshold.get()
+            downloadSizeThreshold = extension.downloadSizeThreshold,
+            installSizeThreshold = extension.installSizeThreshold
         )
     }
 

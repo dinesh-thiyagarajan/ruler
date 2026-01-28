@@ -16,6 +16,7 @@
 
 package com.spotify.ruler.plugin
 
+import org.gradle.api.Action
 import org.gradle.api.file.RegularFile
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
@@ -34,6 +35,12 @@ open class RulerExtension(objects: ObjectFactory) {
 
     val omitFileBreakdown: Property<Boolean> = objects.property(Boolean::class.java)
     val unstrippedNativeFiles: ListProperty<RegularFile> = objects.listProperty(RegularFile::class.java)
+
+    internal val verification = RulerVerificationExtension()
+
+    fun verification(action: Action<RulerVerificationExtension>) {
+        action.execute(verification)
+    }
 
     // Set up default values
     init {

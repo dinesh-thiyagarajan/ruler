@@ -53,7 +53,14 @@ import java.util.logging.Logger
 
 class RulerCli : CliktCommand(), BaseRulerTask {
     private val logger = Logger.getLogger("Ruler")
-    private val dependencyMap by option().file().required()
+    private val dependencyMap by option(
+        help = "Path to a dependency map JSON file. Required unless --dependency-jars-dir is provided."
+    ).file()
+    private val dependencyJarsDir: List<File> by option(
+        "--dependency-jars-dir",
+        help = "Directories to scan for JAR files to auto-generate the dependency map. " +
+            "Can be specified multiple times. Module names are inferred from file paths."
+    ).file(mustExist = true, canBeDir = true).multiple()
     private val apkFile by option().file()
     private val bundleFile by option().file()
     private val reportDir by option().file(canBeDir = true).required()
@@ -112,10 +119,41 @@ class RulerCli : CliktCommand(), BaseRulerTask {
         )
     }
 
+    /**
+     * Resolves the [ModuleMap] to use for dependency analysis.
+     * Uses the provided --dependency-map file if given, otherwise auto-generates
+     * from --dependency-jars-dir directories.
+     */
+    private val resolvedModuleMap: ModuleMap by lazy {
+        when {
+            dependencyMap != null -> {
+                logger.log(Level.INFO, "Using provided dependency map: ${dependencyMap!!.path}")
+                Json.decodeFromStream<ModuleMap>(dependencyMap!!.inputStream())
+            }
+            dependencyJarsDir.isNotEmpty() -> {
+                logger.log(Level.INFO, "Auto-generating dependency map from ${dependencyJarsDir.size} directory(ies)")
+                val generator = DependencyMapGenerator()
+                val moduleMap = generator.generate(dependencyJarsDir)
+
+                // Also save the generated map to the report directory for reference
+                val outputFile = reportDir.resolve("generated-dependency-map.json")
+                generator.generateToFile(dependencyJarsDir, outputFile)
+                echo("Generated dependency map written to: ${outputFile.absolutePath}")
+
+                moduleMap
+            }
+            else -> {
+                throw IllegalArgumentException(
+                    "Either --dependency-map or --dependency-jars-dir must be provided."
+                )
+            }
+        }
+    }
+
     private val dependencies: Map<String, List<DependencyComponent>> by lazy {
-        val json = Json.decodeFromStream<ModuleMap>(dependencyMap.inputStream())
+        val moduleMap = resolvedModuleMap
         val jarArtifactParser = JarArtifactParser()
-        val jarDependencies = json.jars.distinctBy {
+        val jarDependencies = moduleMap.jars.distinctBy {
             it.jar
         }.flatMap {
             jarArtifactParser.parseFile(
@@ -123,11 +161,11 @@ class RulerCli : CliktCommand(), BaseRulerTask {
             )
         }
 
-        val assets = json.assets.map {
+        val assets = moduleMap.assets.map {
             DependencyEntry.Default(it.filename, it.module)
         }
 
-        val resources = json.resources.distinctBy { "${it.module}:${it.filename}" }.map {
+        val resources = moduleMap.resources.distinctBy { "${it.module}:${it.filename}" }.map {
             DependencyEntry.Default(it.filename, it.module)
         }
 
@@ -176,12 +214,17 @@ class RulerCli : CliktCommand(), BaseRulerTask {
     override fun provideDependencies(): Map<String, List<DependencyComponent>> = dependencies
 
     override fun run() {
+        val depSource = when {
+            dependencyMap != null -> "Dependency Map: ${dependencyMap!!.path}"
+            dependencyJarsDir.isNotEmpty() -> "Auto-generated from dirs: ${dependencyJarsDir.joinToString { it.path }}"
+            else -> "None (will fail)"
+        }
 
         logger.log(
             Level.INFO, """
         ~~~~~ Starting Ruler ~~~~~
-       
-        Using Dependency Map: ${dependencyMap.path}
+
+        Using $depSource
         Using APK File: ${apkFile?.path}
         Using Bundle File: ${bundleFile?.path}
         Using Proguard Mapping File: ${mappingFile?.path}
